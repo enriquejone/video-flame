@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Lecture Frame Extractor</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  color-scheme:light;
+  --bg:#eef1f5;--panel:#ffffff;--ink:#16202c;--mute:#5d6b7b;--line:#d5dce5;
+  --accent:#2547d8;--accent-ink:#ffffff;--mark:#e8a317;--stage:#0c1219;
+  --font:"Schibsted Grotesk",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    color-scheme:dark;
+    --bg:#0f151d;--panel:#172029;--ink:#e7edf4;--mute:#93a1b2;--line:#263341;
+    --accent:#7b96ff;--accent-ink:#0f151d;--mark:#f2b640;--stage:#06090d;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#0f151d;--panel:#172029;--ink:#e7edf4;--mute:#93a1b2;--line:#263341;
+  --accent:#7b96ff;--accent-ink:#0f151d;--mark:#f2b640;--stage:#06090d;
+}
+*{box-sizing:border-box}
+:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font:400 16px/1.5 var(--font)}
+.wrap{max-width:1240px;margin:0 auto;padding:28px 20px 56px}
+h1{font-size:clamp(1.7rem,3.2vw,2.4rem);line-height:1.1;margin:0 0 6px;font-weight:700;letter-spacing:-.02em}
+.lede{margin:0 0 24px;color:var(--mute);max-width:60ch}
+button,select,input{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.btn{border:1px solid var(--line);background:var(--panel);padding:9px 15px;border-radius:8px;font-weight:500}
+.btn:hover{border-color:var(--accent)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.primary:hover{filter:brightness(1.08)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn.sm{padding:5px 10px;font-size:.88rem}
+
+/* drop zone */
+.drop{display:block;border:2px dashed var(--line);border-radius:14px;background:var(--panel);padding:64px 20px;text-align:center;cursor:pointer}
+.drop.over,.drop:hover{border-color:var(--accent)}
+.drop strong{display:block;font-size:1.25rem;margin-bottom:4px}
+.drop span{color:var(--mute)}
+.drop input{position:absolute;opacity:0;width:1px;height:1px}
+
+/* workspace */
+.work{display:none;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:22px;align-items:start}
+.work.on{display:grid}
+@media (max-width:900px){.work.on{grid-template-columns:1fr}}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px}
+.stage{background:var(--stage);border-radius:10px;overflow:hidden}
+video{display:block;width:100%;max-height:62vh;background:var(--stage)}
+.meta{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;color:var(--mute);font-size:.88rem;margin:10px 0 6px}
+.meta b{color:var(--ink);font-weight:500;overflow-wrap:anywhere}
+
+/* timeline: the signature element */
+.track{position:relative;height:34px;margin:6px 0 14px;border-radius:8px;background:var(--bg);border:1px solid var(--line);cursor:pointer;overflow:hidden}
+.track i{position:absolute;top:5px;bottom:5px;width:3px;margin-left:-1px;border-radius:2px;background:var(--mark)}
+.track .head{position:absolute;top:0;bottom:0;width:2px;background:var(--accent);pointer-events:none}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.status{min-height:1.4em;margin:10px 0 0;color:var(--mute);font-size:.92rem}
+
+h2{font-size:1.05rem;margin:0 0 4px}
+.hint{color:var(--mute);font-size:.88rem;margin:0 0 12px}
+.field{display:grid;gap:4px;margin:12px 0}
+.field label{display:flex;justify-content:space-between;font-weight:500;font-size:.92rem}
+.field output{color:var(--mute);font-variant-numeric:tabular-nums}
+input[type=range]{width:100%;accent-color:var(--accent)}
+select{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:8px 10px}
+.bar{height:6px;border-radius:3px;background:var(--bg);border:1px solid var(--line);overflow:hidden;margin-top:12px;display:none}
+.bar.on{display:block}
+.bar div{height:100%;width:0;background:var(--accent)}
+hr{border:0;border-top:1px solid var(--line);margin:16px 0}
+
+/* gallery */
+.shots{grid-column:1/-1}
+.shots-head{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:14px}
+.card{border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--bg)}
+.card img{display:block;width:100%;aspect-ratio:16/9;object-fit:contain;background:var(--stage);cursor:pointer}
+.card .bar2{display:flex;justify-content:space-between;align-items:center;padding:7px 8px;gap:6px}
+.card .t{font-variant-numeric:tabular-nums;font-weight:500}
+.empty{grid-column:1/-1;color:var(--mute);padding:28px 0;text-align:center}
+.kbd{border:1px solid var(--line);border-bottom-width:2px;border-radius:5px;padding:0 6px;font-size:.82rem;background:var(--bg)}
+.top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <div>
+      <h1>Lecture frame extractor</h1>
+      <p class="lede">Open a recorded lecture and save its slides as images. Capture frames yourself, or let the scanner find each slide change. Your video stays on your device.</p>
+    </div>
+    <button class="btn sm" id="theme" type="button">Switch theme</button>
+  </div>
+
+  <label class="drop" id="drop">
+    <strong>Choose a lecture video</strong>
+    <span>or drop an MP4, WebM or MOV file here</span>
+    <input type="file" id="file" accept="video/*">
+  </label>
+
+  <div class="work" id="work">
+    <section class="panel">
+      <div class="stage"><video id="video" controls playsinline preload="auto"></video></div>
+      <div class="meta"><b id="fname"></b><span id="vinfo"></span></div>
+      <div class="track" id="track" title="Gold marks show captured slides. Click to jump."><div class="head" id="head"></div></div>
+      <div class="row">
+        <button class="btn primary" id="cap" type="button">Capture this frame</button>
+        <button class="btn" id="back" type="button">Back 5s</button>
+        <button class="btn" id="fwd" type="button">Forward 5s</button>
+        <span class="hint" style="margin:0 0 0 auto">Shortcut: <span class="kbd">C</span></span>
+      </div>
+      <p class="status" id="status" role="status" aria-live="polite"></p>
+    </section>
+
+    <section class="panel">
+      <h2>Find slides automatically</h2>
+      <p class="hint">The scanner steps through the video and saves a frame whenever the picture changes enough to be a new slide.</p>
+      <div class="field">
+        <label for="step">Check every <output id="stepO">3 s</output></label>
+        <input type="range" id="step" min="1" max="15" value="3">
+      </div>
+      <div class="field">
+        <label for="thr">Change needed for a new slide <output id="thrO">8</output></label>
+        <input type="range" id="thr" min="2" max="30" value="8">
+        <span class="hint" style="margin:0">Lower finds more slides. Raise it if a moving speaker or cursor adds extras.</span>
+      </div>
+      <div class="row">
+        <button class="btn primary" id="scan" type="button">Scan whole video</button>
+        <button class="btn" id="stop" type="button" disabled>Stop</button>
+      </div>
+      <div class="bar" id="bar"><div id="fill"></div></div>
+      <hr>
+      <div class="field">
+        <label for="fmt">Image format</label>
+        <select id="fmt"><option value="png">PNG (sharpest)</option><option value="jpg">JPG (smaller files)</option></select>
+      </div>
+      <button class="btn" id="other" type="button">Open a different video</button>
+    </section>
+
+    <section class="panel shots">
+      <div class="shots-head">
+        <h2 id="count">Captured slides (0)</h2>
+        <div class="row">
+          <button class="btn primary" id="zip" type="button" disabled>Download all as ZIP</button>
+          <button class="btn" id="clear" type="button" disabled>Remove all</button>
+        </div>
+      </div>
+      <div class="grid" id="grid"></div>
+    </section>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script>
+const $ = s => document.querySelector(s);
+const v = $('#video'), grid = $('#grid'), track = $('#track');
+let shots = [], url = null, uid = 0, scanning = false, cancel = false, base = 'lecture';
+
+function fmt(t){
+  t = Math.max(0, Math.floor(t));
+  const h = Math.floor(t/3600), m = Math.floor(t%3600/60), s = t%60;
+  return (h ? h+':'+String(m).padStart(2,'0') : m)+':'+String(s).padStart(2,'0');
+}
+function say(msg){ $('#status').textContent = msg; }
+
+/* ---------- loading ---------- */
+function loadFile(f){
+  if(!f || !f.type.startsWith('video/')){ say('That file is not a video. Choose an MP4, WebM or MOV file.'); return; }
+  clearAll();
+  if(url) URL.revokeObjectURL(url);
+  url = URL.createObjectURL(f);
+  base = f.name.replace(/\.[^.]+$/, '');
+  v.src = url;
+  $('#fname').textContent = f.name;
+  $('#drop').style.display = 'none';
+  $('#work').classList.add('on');
+  say('Play or scrub to a slide, then press Capture, or run the scanner.');
+}
+v.addEventListener('loadedmetadata', () => {
+  $('#vinfo').textContent = v.videoWidth+'×'+v.videoHeight+' · '+fmt(v.duration);
+  renderMarks();
+});
+v.addEventListener('error', () => say('This browser cannot play that video. Try an MP4 (H.264) or WebM file.'));
+$('#file').addEventListener('change', e => loadFile(e.target.files[0]));
+$('#other').addEventListener('click', () => { v.pause(); $('#work').classList.remove('on'); $('#drop').style.display = 'block'; $('#file').value = ''; });
+['dragenter','dragover'].forEach(n => window.addEventListener(n, e => { e.preventDefault(); $('#drop').classList.add('over'); }));
+['dragleave','drop'].forEach(n => window.addEventListener(n, e => { e.preventDefault(); $('#drop').classList.remove('over'); }));
+window.addEventListener('drop', e => loadFile(e.dataTransfer.files[0]));
+
+/* ---------- capture ---------- */
+function grab(src){
+  const c = document.createElement('canvas');
+  c.width = src.videoWidth; c.height = src.videoHeight;
+  c.getContext('2d').drawImage(src, 0, 0);
+  const jpg = $('#fmt').value === 'jpg';
+  return new Promise(r => c.toBlob(r, jpg ? 'image/jpeg' : 'image/png', .92));
+}
+function addShot(t, blob){
+  if(shots.some(s => Math.abs(s.t - t) < .3)) return false;
+  shots.push({ id: ++uid, t, blob, url: URL.createObjectURL(blob), ext: blob.type === 'image/jpeg' ? 'jpg' : 'png' });
+  shots.sort((a,b) => a.t - b.t);
+  render();
+  return true;
+}
+async function capture(){
+  if(!v.videoWidth){ say('Open a video first.'); return; }
+  const t = v.currentTime;
+  const blob = await grab(v);
+  say(addShot(t, blob) ? 'Captured the frame at '+fmt(t)+'.' : 'A frame near '+fmt(t)+' is already captured.');
+}
+$('#cap').addEventListener('click', capture);
+$('#back').addEventListener('click', () => v.currentTime = Math.max(0, v.currentTime - 5));
+$('#fwd').addEventListener('click', () => v.currentTime = Math.min(v.duration, v.currentTime + 5));
+document.addEventListener('keydown', e => {
+  if(e.target.matches('input,select,textarea') || e.ctrlKey || e.metaKey) return;
+  if(e.key.toLowerCase() === 'c'){ e.preventDefault(); capture(); }
+  if(e.target !== v){
+    if(e.key === 'ArrowLeft') v.currentTime = Math.max(0, v.currentTime - 5);
+    if(e.key === 'ArrowRight') v.currentTime = Math.min(v.duration, v.currentTime + 5);
+  }
+});
+
+/* ---------- auto scan ---------- */
+const sc = document.createElement('canvas'); sc.width = 64; sc.height = 36;
+const sx = sc.getContext('2d', { willReadFrequently: true });
+function small(el){
+  sx.drawImage(el, 0, 0, 64, 36);
+  const d = sx.getImageData(0, 0, 64, 36).data, out = new Float32Array(64*36);
+  for(let i = 0; i < out.length; i++) out[i] = .299*d[i*4] + .587*d[i*4+1] + .114*d[i*4+2];
+  return out;
+}
+function diff(a, b){ let s = 0; for(let i = 0; i < a.length; i++) s += Math.abs(a[i] - b[i]); return s / a.length; }
+function seek(el, t){
+  return new Promise(res => {
+    if(Math.abs(el.currentTime - t) < .001) return res();
+    const done = () => { el.removeEventListener('seeked', done); clearTimeout(to); res(); };
+    const to = setTimeout(done, 5000);
+    el.addEventListener('seeked', done);
+    el.currentTime = t;
+  });
+}
+async function scan(){
+  if(scanning || !v.videoWidth) return;
+  scanning = true; cancel = false;
+  $('#scan').disabled = true; $('#stop').disabled = false; $('#bar').classList.add('on');
+  v.pause();
+  const w = document.createElement('video');
+  w.muted = true; w.preload = 'auto'; w.src = url;
+  await new Promise(r => { w.onloadeddata = r; w.onerror = r; });
+  const step = +$('#step').value, thr = +$('#thr').value, dur = w.duration || v.duration;
+  let ref = null, found = 0;
+  try{
+    for(let t = 0; t < dur && !cancel; t += step){
+      await seek(w, t);
+      const cur = small(w);
+      if(!ref || diff(ref, cur) > thr){
+        let at = t;
+        if(ref){ at = Math.min(t + .6, dur - .05); await seek(w, at); }
+        ref = small(w);
+        if(addShot(at, await grab(w))) found++;
+      }
+      $('#fill').style.width = Math.min(100, t/dur*100)+'%';
+      say('Scanning… '+fmt(t)+' of '+fmt(dur)+' · '+found+' new slides');
+    }
+    say((cancel ? 'Stopped. ' : 'Scan finished. ')+found+' new slides captured.');
+  }catch(err){
+    say('The scan stopped because the browser could not read a frame.');
+  }
+  w.removeAttribute('src'); w.load();
+  scanning = false;
+  $('#scan').disabled = false; $('#stop').disabled = true;
+  setTimeout(() => { $('#bar').classList.remove('on'); $('#fill').style.width = '0'; }, 800);
+}
+$('#scan').addEventListener('click', scan);
+$('#stop').addEventListener('click', () => cancel = true);
+$('#step').addEventListener('input', e => $('#stepO').textContent = e.target.value+' s');
+$('#thr').addEventListener('input', e => $('#thrO').textContent = e.target.value);
+
+/* ---------- gallery ---------- */
+function name(s){ return 'slide-'+String(shots.indexOf(s)+1).padStart(3,'0')+'-'+fmt(s.t).replace(/:/g,'-')+'.'+s.ext; }
+function render(){
+  $('#count').textContent = 'Captured slides ('+shots.length+')';
+  $('#zip').disabled = $('#clear').disabled = !shots.length;
+  grid.innerHTML = shots.length ? '' : '<p class="empty">No slides yet. Capture a frame or run the scanner.</p>';
+  for(const s of shots){
+    const d = document.createElement('div');
+    d.className = 'card'; d.dataset.id = s.id;
+    d.innerHTML = '<img alt="Slide at '+fmt(s.t)+'" src="'+s.url+'" data-act="seek">'+
+      '<div class="bar2"><span class="t">'+fmt(s.t)+'</span><span class="row" style="gap:4px">'+
+      '<button class="btn sm" data-act="save" type="button">Save</button>'+
+      '<button class="btn sm" data-act="del" type="button" aria-label="Remove slide at '+fmt(s.t)+'">Remove</button></span></div>';
+    grid.appendChild(d);
+  }
+  renderMarks();
+}
+grid.addEventListener('click', e => {
+  const act = e.target.dataset.act, card = e.target.closest('.card');
+  if(!act || !card) return;
+  const s = shots.find(x => x.id == card.dataset.id);
+  if(act === 'seek') v.currentTime = s.t;
+  if(act === 'save') dl(s.blob, name(s));
+  if(act === 'del'){ URL.revokeObjectURL(s.url); shots = shots.filter(x => x !== s); render(); }
+});
+function clearAll(){ shots.forEach(s => URL.revokeObjectURL(s.url)); shots = []; render(); }
+$('#clear').addEventListener('click', clearAll);
+
+function dl(blob, filename){
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+}
+$('#zip').addEventListener('click', async () => {
+  if(!shots.length) return;
+  if(!window.JSZip){
+    say('ZIP support did not load (you may be offline). Saving the images one by one instead.');
+    shots.forEach((s, i) => setTimeout(() => dl(s.blob, name(s)), i*300));
+    return;
+  }
+  say('Building ZIP…');
+  const z = new JSZip();
+  shots.forEach(s => z.file(name(s), s.blob));
+  dl(await z.generateAsync({ type: 'blob' }), base+'-slides.zip');
+  say('ZIP saved with '+shots.length+' images.');
+});
+
+/* ---------- timeline ---------- */
+function renderMarks(){
+  track.querySelectorAll('i').forEach(n => n.remove());
+  if(!v.duration) return;
+  for(const s of shots){
+    const i = document.createElement('i');
+    i.style.left = (s.t / v.duration * 100)+'%';
+    track.appendChild(i);
+  }
+}
+track.addEventListener('click', e => {
+  const r = track.getBoundingClientRect();
+  if(v.duration) v.currentTime = (e.clientX - r.left) / r.width * v.duration;
+});
+v.addEventListener('timeupdate', () => { if(v.duration) $('#head').style.left = (v.currentTime / v.duration * 100)+'%'; });
+
+/* ---------- theme ---------- */
+$('#theme').addEventListener('click', () => {
+  const root = document.documentElement;
+  const dark = root.dataset.theme ? root.dataset.theme === 'dark' : matchMedia('(prefers-color-scheme:dark)').matches;
+  root.dataset.theme = dark ? 'light' : 'dark';
+});
+render();
+</script>
+</body>
+</html>
